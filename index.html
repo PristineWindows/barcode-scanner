@@ -19,9 +19,8 @@ h2 {
 }
 
 #reader {
-  width: 320px;
-  margin: auto;
-  margin-bottom: 20px;
+  width: 280px;
+  margin: 10px auto;
 }
 
 table {
@@ -136,12 +135,34 @@ function updateTable() {
   }
 }
 
-const scanner = new Html5QrcodeScanner("reader", {
-  fps: 10,
-  qrbox: 250
-});
+// Initialize scanner with smaller scan box and zoom closer
+const html5QrCode = new Html5Qrcode("reader");
 
-scanner.render(onScanSuccess);
+Html5Qrcode.getCameras().then(devices => {
+  if (devices && devices.length) {
+    let cameraId = devices[0].id;
+
+    html5QrCode.start(
+      cameraId,
+      {
+        fps: 10,
+        qrbox: { width: 200, height: 200 }, // smaller scan box
+        aspectRatio: 1.0
+      },
+      onScanSuccess
+    ).then(() => {
+      // Attempt camera zoom (if supported)
+      const track = html5QrCode.getRunningTrack();
+      const capabilities = track.getCapabilities();
+
+      if (capabilities.zoom) {
+        track.applyConstraints({
+          advanced: [{ zoom: capabilities.zoom.max / 2 }]
+        });
+      }
+    });
+  }
+});
 
 function downloadCSV() {
   let csv = "No,Barcode,Quantity,First Scan\n";
@@ -155,28 +176,6 @@ function downloadCSV() {
   const a = document.createElement("a");
   a.href = url;
   a.download = "inventory.csv";
-  a.click();
-}
-</script>
-
-</body>
-</html>  const row = table.insertRow();
-  row.insertCell(0).innerText = count;
-  row.insertCell(1).innerText = decodedText;
-  row.insertCell(2).innerText = time;
-}
-
-const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-scanner.render(onScanSuccess);
-
-function downloadCSV() {
-  let csv = "No,Barcode,Time\n";
-  scanned.forEach(row => csv += row.join(",") + "\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "barcodes.csv";
   a.click();
 }
 </script>
