@@ -2,39 +2,165 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner</title>
+<title>Inventory Barcode Scanner</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
+
 <style>
-body { font-family: Arial; text-align: center; padding:20px; }
-#reader { width: 300px; margin:auto; }
-table { margin:20px auto; border-collapse:collapse; }
-td, th { border:1px solid #ccc; padding:8px; }
-button { padding:10px; margin:5px; cursor:pointer; }
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f4f8;
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+}
+
+h2 {
+  margin-bottom: 15px;
+}
+
+#reader {
+  width: 320px;
+  margin: auto;
+  margin-bottom: 20px;
+}
+
+table {
+  width: 100%;
+  max-width: 600px;
+  margin: auto;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+th {
+  background: #007bff;
+  color: white;
+  padding: 12px;
+}
+
+td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+button {
+  margin-top: 20px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #28a745;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.9;
+}
 </style>
 </head>
+
 <body>
 
-<h2>📷 Barcode Scanner</h2>
+<h2>📦 Inventory Barcode Scanner</h2>
+
 <div id="reader"></div>
 
-<h3>Scanned Codes</h3>
+<h3>Scanned Items</h3>
 <table id="dataTable">
-<tr><th>#</th><th>Barcode</th><th>Time</th></tr>
+<tr>
+<th>#</th>
+<th>Barcode</th>
+<th>Quantity</th>
+<th>First Scan</th>
+</tr>
 </table>
 
 <button onclick="downloadCSV()">Download Excel File</button>
 
 <script>
-let count = 0;
-let scanned = [];
+let scannedItems = {};
+let scanDelay = 1500;
+let lastScanTime = 0;
+
+// Beep sound
+function beep() {
+  const audio = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+  audio.play();
+}
 
 function onScanSuccess(decodedText) {
-  count++;
-  const time = new Date().toLocaleString();
-  scanned.push([count, decodedText, time]);
+  const now = Date.now();
+  if (now - lastScanTime < scanDelay) return;
+  lastScanTime = now;
 
+  beep();
+
+  if (scannedItems[decodedText]) {
+    scannedItems[decodedText].qty++;
+  } else {
+    scannedItems[decodedText] = {
+      qty: 1,
+      time: new Date().toLocaleString()
+    };
+  }
+
+  updateTable();
+}
+
+function updateTable() {
   const table = document.getElementById("dataTable");
-  const row = table.insertRow();
+  table.innerHTML = `
+    <tr>
+      <th>#</th>
+      <th>Barcode</th>
+      <th>Quantity</th>
+      <th>First Scan</th>
+    </tr>
+  `;
+
+  let index = 1;
+  for (let code in scannedItems) {
+    const row = table.insertRow();
+    row.insertCell(0).innerText = index++;
+    row.insertCell(1).innerText = code;
+    row.insertCell(2).innerText = scannedItems[code].qty;
+    row.insertCell(3).innerText = scannedItems[code].time;
+  }
+}
+
+const scanner = new Html5QrcodeScanner("reader", {
+  fps: 10,
+  qrbox: 250
+});
+
+scanner.render(onScanSuccess);
+
+function downloadCSV() {
+  let csv = "No,Barcode,Quantity,First Scan\n";
+  let index = 1;
+  for (let code in scannedItems) {
+    csv += `${index++},${code},${scannedItems[code].qty},${scannedItems[code].time}\n`;
+  }
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "inventory.csv";
+  a.click();
+}
+</script>
+
+</body>
+</html>  const row = table.insertRow();
   row.insertCell(0).innerText = count;
   row.insertCell(1).innerText = decodedText;
   row.insertCell(2).innerText = time;
