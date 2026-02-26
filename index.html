@@ -29,7 +29,7 @@ h2 {
 
 #reader {
   width: 100%;
-  height: 45vh;
+  height: 50vh;
 }
 
 table {
@@ -84,7 +84,7 @@ button {
 
 <h2>📦 Inventory Scanner</h2>
 
-<input id="areaInput" placeholder="Enter Area / Location Name (e.g. Warehouse A Shelf 3)">
+<input id="areaInput" placeholder="Enter Area / Location Name">
 
 <div id="reader"></div>
 
@@ -101,22 +101,22 @@ button {
 <button class="exportBtn" onclick="downloadCSV()">Download Excel</button>
 
 <script>
-let scannedItems = {};
-let scanDelay = 2000;
-let lastScanTime = 0;
 
-let lastDetected = null;
-let matchCount = 0;
-const requiredMatches = 2;
+let scannedItems = {};
+let lastScan = "";
+let lastScanTime = 0;
+let scanCooldown = 800; // fast but prevents spam
 
 function beep() {
   const audio = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
   audio.play();
 }
 
+// Checksum validation
 function isValidBarcode(code) {
   if (!/^\d+$/.test(code)) return false;
-  if (code.length !== 12 && code.length !== 13) return false;
+  if (code.length !== 12 && code.length !== 13) return true; 
+  // If not UPC/EAN length, allow it (prevents blocking legit codes)
 
   let sum = 0;
   let isEven = false;
@@ -135,21 +135,14 @@ function onScanSuccess(decodedText) {
 
   if (!isValidBarcode(decodedText)) return;
 
-  if (decodedText === lastDetected) {
-    matchCount++;
-  } else {
-    lastDetected = decodedText;
-    matchCount = 1;
+  const now = Date.now();
+
+  if (decodedText === lastScan && now - lastScanTime < scanCooldown) {
     return;
   }
 
-  if (matchCount < requiredMatches) return;
-
-  const now = Date.now();
-  if (now - lastScanTime < scanDelay) return;
+  lastScan = decodedText;
   lastScanTime = now;
-
-  matchCount = 0;
 
   beep();
 
@@ -213,13 +206,6 @@ function deleteItem(code) {
   }
 }
 
-const scanner = new Html5QrcodeScanner("reader", {
-  fps: 5,
-  qrbox: { width: 250, height: 250 }
-});
-
-scanner.render(onScanSuccess);
-
 function downloadCSV() {
   const areaName = document.getElementById("areaInput").value || "Unnamed Area";
 
@@ -238,6 +224,25 @@ function downloadCSV() {
   a.download = `${areaName.replace(/\s+/g,'_')}_inventory.csv`;
   a.click();
 }
+
+// Fast scanner engine
+const html5QrCode = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(devices => {
+  if (devices && devices.length) {
+    html5QrCode.start(
+      { facingMode: "environment" },
+      {
+        fps: 15,
+        qrbox: { width: 250, height: 250 }
+      },
+      onScanSuccess
+    );
+  }
+}).catch(err => {
+  alert("Camera error: " + err);
+});
+
 </script>
 
 </body>
