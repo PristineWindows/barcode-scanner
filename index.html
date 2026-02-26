@@ -1,3 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Inventory Barcode Scanner</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f4f8;
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+}
+
+h2 {
+  margin-bottom: 15px;
+}
+
+#reader {
+  width: 320px;
+  margin: auto;
+  margin-bottom: 20px;
+}
+
+table {
+  width: 100%;
+  max-width: 600px;
+  margin: auto;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+th {
+  background: #007bff;
+  color: white;
+  padding: 12px;
+}
+
+td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+button {
+  margin-top: 20px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #28a745;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📦 Inventory Barcode Scanner</h2>
+
+<div id="reader"></div>
+
+<h3>Scanned Items</h3>
+<table id="dataTable">
+<tr>
+<th>#</th>
+<th>Barcode</th>
+<th>Quantity</th>
+<th>First Scan</th>
+</tr>
+</table>
+
+<button onclick="downloadCSV()">Download Excel File</button>
+
 <script>
 let scannedItems = {};
 let scanDelay = 1200;
@@ -71,9 +158,12 @@ function updateTable() {
   }
 }
 
+// Initialize scanner
 const scanner = new Html5QrcodeScanner("reader", {
   fps: 10,
-  qrbox: 250
+  qrbox: 250,
+  // Automatically select rear camera on mobile if available
+  experimentalFeatures: { useBarCodeDetectorIfSupported: true }
 });
 
 scanner.render(onScanSuccess);
@@ -93,3 +183,6 @@ function downloadCSV() {
   a.click();
 }
 </script>
+
+</body>
+</html>
