@@ -2,89 +2,42 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Inventory Barcode Scanner</title>
+<title>Inventory Scanner</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
 body {
   font-family: Arial, sans-serif;
-  margin: 0;
-  background: #f2f4f8;
   text-align: center;
-}
-
-h2 {
-  margin: 15px 0 5px 0;
-}
-
-#areaInput {
-  width: 90%;
-  max-width: 400px;
-  padding: 10px;
-  font-size: 16px;
-  margin-bottom: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
+  background: #f5f5f5;
 }
 
 #reader {
-  width: 100%;
-  height: 50vh;
+  width: 300px;
+  margin: 20px auto;
 }
 
 table {
-  width: 95%;
-  margin: 15px auto;
+  margin: 20px auto;
   border-collapse: collapse;
   background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
-th {
-  background: #007bff;
-  color: white;
-  padding: 10px;
-}
-
-td {
-  padding: 8px;
-  border-bottom: 1px solid #ddd;
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px 12px;
 }
 
 button {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.deleteBtn {
-  background: #dc3545;
-  color: white;
-}
-
-.editBtn {
-  background: #ffc107;
-}
-
-.exportBtn {
-  margin: 15px;
-  padding: 12px 20px;
-  background: #28a745;
-  color: white;
-  font-size: 16px;
+  padding: 8px 12px;
+  margin: 10px;
 }
 </style>
 </head>
 
 <body>
 
-<h2>📦 Inventory Scanner</h2>
-
-<input id="areaInput" placeholder="Enter Area / Location Name">
+<h2>Barcode Inventory Scanner</h2>
 
 <div id="reader"></div>
 
@@ -92,31 +45,29 @@ button {
 <tr>
 <th>#</th>
 <th>Barcode</th>
-<th>Qty</th>
+<th>Quantity</th>
 <th>First Scan</th>
-<th>Actions</th>
 </tr>
 </table>
 
-<button class="exportBtn" onclick="downloadCSV()">Download Excel</button>
+<button onclick="downloadCSV()">Download Excel</button>
 
 <script>
 
 let scannedItems = {};
-let lastScan = "";
+let lastDetected = "";
+let confirmCount = 0;
+const requiredMatches = 2;
 let lastScanTime = 0;
-let scanCooldown = 800; // fast but prevents spam
+const cooldown = 1000;
 
-function beep() {
-  const audio = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
-  audio.play();
-}
-
-// Checksum validation
+// Simple checksum for UPC/EAN
 function isValidBarcode(code) {
   if (!/^\d+$/.test(code)) return false;
-  if (code.length !== 12 && code.length !== 13) return true; 
-  // If not UPC/EAN length, allow it (prevents blocking legit codes)
+
+  if (code.length !== 12 && code.length !== 13) {
+    return true; // allow non-UPC codes
+  }
 
   let sum = 0;
   let isEven = false;
@@ -135,16 +86,22 @@ function onScanSuccess(decodedText) {
 
   if (!isValidBarcode(decodedText)) return;
 
-  const now = Date.now();
-
-  if (decodedText === lastScan && now - lastScanTime < scanCooldown) {
+  // Require 2 identical reads in a row
+  if (decodedText === lastDetected) {
+    confirmCount++;
+  } else {
+    lastDetected = decodedText;
+    confirmCount = 1;
     return;
   }
 
-  lastScan = decodedText;
+  if (confirmCount < requiredMatches) return;
+
+  const now = Date.now();
+  if (now - lastScanTime < cooldown) return;
   lastScanTime = now;
 
-  beep();
+  confirmCount = 0;
 
   if (scannedItems[decodedText]) {
     scannedItems[decodedText].qty++;
@@ -160,18 +117,12 @@ function onScanSuccess(decodedText) {
 
 function updateTable() {
   const table = document.getElementById("dataTable");
-  const areaName = document.getElementById("areaInput").value || "Unnamed Area";
-
   table.innerHTML = `
-    <tr>
-      <th colspan="5">${areaName}</th>
-    </tr>
     <tr>
       <th>#</th>
       <th>Barcode</th>
-      <th>Qty</th>
+      <th>Quantity</th>
       <th>First Scan</th>
-      <th>Actions</th>
     </tr>
   `;
 
@@ -182,37 +133,13 @@ function updateTable() {
     row.insertCell(1).innerText = code;
     row.insertCell(2).innerText = scannedItems[code].qty;
     row.insertCell(3).innerText = scannedItems[code].time;
-
-    const actions = row.insertCell(4);
-    actions.innerHTML = `
-      <button class="editBtn" onclick="editQty('${code}')">Edit</button>
-      <button class="deleteBtn" onclick="deleteItem('${code}')">Delete</button>
-    `;
-  }
-}
-
-function editQty(code) {
-  let newQty = prompt("Enter new quantity:", scannedItems[code].qty);
-  if (newQty !== null && !isNaN(newQty) && newQty > 0) {
-    scannedItems[code].qty = parseInt(newQty);
-    updateTable();
-  }
-}
-
-function deleteItem(code) {
-  if (confirm("Delete this item?")) {
-    delete scannedItems[code];
-    updateTable();
   }
 }
 
 function downloadCSV() {
-  const areaName = document.getElementById("areaInput").value || "Unnamed Area";
-
-  let csv = `Area: ${areaName}\n\n`;
-  csv += "No,Barcode,Quantity,First Scan\n";
-
+  let csv = "No,Barcode,Quantity,First Scan\n";
   let index = 1;
+
   for (let code in scannedItems) {
     csv += `${index++},${code},${scannedItems[code].qty},${scannedItems[code].time}\n`;
   }
@@ -221,27 +148,16 @@ function downloadCSV() {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${areaName.replace(/\s+/g,'_')}_inventory.csv`;
+  a.download = "inventory.csv";
   a.click();
 }
 
-// Fast scanner engine
-const html5QrCode = new Html5Qrcode("reader");
-
-Html5Qrcode.getCameras().then(devices => {
-  if (devices && devices.length) {
-    html5QrCode.start(
-      { facingMode: "environment" },
-      {
-        fps: 15,
-        qrbox: { width: 250, height: 250 }
-      },
-      onScanSuccess
-    );
-  }
-}).catch(err => {
-  alert("Camera error: " + err);
+const scanner = new Html5QrcodeScanner("reader", {
+  fps: 10,
+  qrbox: 250
 });
+
+scanner.render(onScanSuccess);
 
 </script>
 
